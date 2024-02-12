@@ -1,12 +1,15 @@
-import { env } from 'process';
 import express from 'express';
-
-const routes = require('./routes/index');
+import loadRoutes from './routes';
+import redisUtils from './utils/redis';
+import dbUtils from './utils/db';
 
 const app = express();
-const port = env.PORT || 5000;
-app.use(express.json());
-app.use(routes);
-app.listen(port, '127.0.0.1');
+const PORT = process.env.PORT || 5000;
 
-export default app;
+loadRoutes(app);
+
+app.listen(PORT, () => {
+  console.log(`Server running on port ${PORT}`);
+  dbUtils.connect();
+  redisUtils.connect();
+});

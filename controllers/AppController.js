@@ -1,21 +1,20 @@
-const { redisClient, db } = require('../utils');
+import redisClient from '../utils/redis';
+import dbClient from '../utils/db';
 
-exports.getStatus = async (req, res) => {
-  try {
-    const redisAlive = await redisClient.ping();
-    const dbAlive = await db.query('SELECT 1');
-    res.status(200).json({ redis: redisAlive === 'PONG', db: dbAlive.rowCount > 0 });
-  } catch (error) {
-    res.status(500).json({ error: 'Server error' });
+class AppController {
+  static async getStatus(req, res) {
+    const redisStatus = redisClient.isAlive();
+    const dbStatus = dbClient.isAlive();
+    res.set('Content-Type', 'application/json');
+    res.status(200).json({ redis: redisStatus, db: dbStatus }).end();
   }
-};
 
-exports.getStats = async (req, res) => {
-  try {
-    const usersCount = await db.query('SELECT COUNT(*) FROM users');
-    const filesCount = await db.query('SELECT COUNT(*) FROM files');
-    res.status(200).json({ users: usersCount.rows[0].count, files: filesCount.rows[0].count });
-  } catch (error) {
-    res.status(500).json({ error: 'Server error' });
+  static async getStats(req, res) {
+    const users = await dbClient.nbUsers();
+    const files = await dbClient.nbFiles();
+    res.set('Content-Type', 'application/json');
+    res.status(200).json({ users, files }).end();
   }
-};
+}
+
+export default AppController;

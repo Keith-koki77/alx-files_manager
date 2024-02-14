@@ -1,61 +1,31 @@
-const crypto = require('crypto');
-const dbClient = require('../utils/db');  
-const redisClient = require('../utils/redis');
+const bcrypt = require('bcrypt');
+const { User } = require('../models');
 
-const UsersController = {
-  async postNew(req, res) {
-    const { email, password } = req.body;
+exports.postNew = async (req, res) => {
+  const { email, password } = req.body;
 
-    if (!email) {
-      return res.status(400).json({error: 'Missing email'});
-    }
-    
-    if (!password) {
-      return res.status(400).json({error: 'Missing password'});
-    }
-
-    const existingUser = await dbClient.getUserByEmail(email);
-
-    if (existingUser) {
-      return res.status(400).json({error: 'Email already exists'});
-    }
-
-    const hashedPassword = crypto.createHash('sha1').update(password).digest('hex');
-    
-    const newUser = await dbClient.createUser(email, hashedPassword);
-   
-    const { email, _id } = newUser;
-
-    return res.status(201).json({ email, id: _id });
-  },
-
-  async getMe(req, res) {
-    const token = req.headers['x-token'];
-
-    if (!token) {
-      return res.status(401).json({error: 'Unauthorized'});
-    }
-
-    try {
-      const userId = await redisClient.get(`auth_${token}`);
-
-      if (!userId) {
-        return res.status(401).json({error: 'Unauthorized'});
-      }
-
-      const user = await dbClient.getUserById(userId);
-
-      if (!user) {
-        return res.status(401).json({error: 'Unauthorized'});  
-      }
-
-      return res.status(200).json({ email: user.email, id: user._id });
-
-    } catch (error) {
-       console.log(error);
-       return res.status(500).json({error: 'Internal Server Error'});
-    }
+  if (!email) {
+    return res.status(400).json({ error: 'Missing email' });
   }
+
+  if (!password) {
+    return res.status(400).json({ error: 'Missing password' });
+  }
+
+  const userExists = await User.findOne({ email });
+
+  if (userExists) {
+    return res.status(400).json({ error: 'Already exist' });
+  }
+
+  const hashedPassword = await bcrypt.hash(password, 10);
+
+  const newUser = new User({
+    email,
+    password: hashedPassword,
+  });
+
+  await newUser.save();
+
+  res.status(201).json({ id: newUser._id, email: newUser.email });
 };
-    
-module.exports = UsersController;

@@ -1,31 +1,59 @@
-const bcrypt = require('bcrypt');
-const { User } = require('../models');
+const crypto = require('crypto');i
+const dbClient = require('../utils/db');
+const redisClient = require('../utils/redis');
 
-exports.postNew = async (req, res) => {
-  const { email, password } = req.body;
+const UsersController = {
+  async postNew(req, res) {
+    const { email, password } = req.body;
 
-  if (!email) {
-    return res.status(400).json({ error: 'Missing email' });
-  }
+    if (!email) {
+      return res.status(400).json({ error: 'Missing email' });
+    }
 
-  if (!password) {
-    return res.status(400).json({ error: 'Missing password' });
-  }
+    if (!password) {
+      return res.status(400).json({ error: 'Missing password' });
+    }
 
-  const userExists = await User.findOne({ email });
+    try {
+      const existingUser = await dbClient.getUserByEmail(email);
+      if (existingUser) {
+        return res.status(400).json({ error: 'Email already exists' });
+      }
 
-  if (userExists) {
-    return res.status(400).json({ error: 'Already exist' });
-  }
+      const hashedPassword = crypto.createHash('sha1').update(password).digest('hex');
+      const newUser = await dbClient.createUser(email, hashedPassword);
 
-  const hashedPassword = await bcrypt.hash(password, 10);
+      return res.status(201).json({ email: newUser.email, id: newUser._id });
+    } catch (error) {
+      console.error('Error creating new user:', error);
+      return res.status(500).json({ error: 'Internal Server Error' });
+    }
+  },
 
-  const newUser = new User({
-    email,
-    password: hashedPassword,
-  });
+  async getMe(req, res) {
+    const token = req.headers['x-token'];
+    if (!token) {
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
 
-  await newUser.save();
+    try {
+      const userId = await redisClient.get(`auth_${token}`);
+      if (!userId) {
+        return res.status(401).json({ error: 'Unauthorized' });
+      }
 
-  res.status(201).json({ id: newUser._id, email: newUser.email });
+      const user = await dbClient.getUserById(userId);
+      if (!user) {
+        return res.status(401).json({ error: 'Unauthorized' });
+      }
+
+      return res.status(200).json({ email: user.email, id: user._id });
+    } catch (error) {
+      console.error('Error retrieving user:', error);
+      return res.status(500).json({ error: 'Internal Server Error' });
+    }
+  },
+
 };
+
+module.exports = UsersController;

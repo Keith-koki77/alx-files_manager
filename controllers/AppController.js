@@ -1,36 +1,34 @@
-import dbUtils from '../utils/db';
-import redisUtils from '../utils/redis';
+import DBClient from '../utils/db.js';
+import RedisClient from '../utils/redis.js';
 
-const AppController = {
-  /**
-   * should return if Redis is alive and if the DB is alive too
-   */
-  async getStatus(req, res) {
-    const redisIsAlive = redisClient.isAlive();
-    const dbIsAlive = dbClient.isAlive();
+/**
+  * should return if Redis is alive and if the DB is alive too
+  */
+async function getStatus(req, res) {
+  const redisAlive = RedisClient.isAlive();
+  const dbAlive = await DBClient.isAlive();
 
-    if (redisIsAlive && dbIsAlive) {
-      res.status(200).json({ redis: true, db: true });
-    } else {
-      res.status(500).json({ redis: redisIsAlive, db: dbIsAlive });
-    }
-  },
+  return res.status(200).json({
+    redis: redisAlive,
+    db: dbAlive
+  });
+}
 
+/**
+  * should return the number of users and files in DB:
+  */
+async function getStats(req, res) {
 
-  /**
-   * should return the number of users and files in DB:
-   */
-  async getStats(req, res) {
-    try {
-      const usersCount = await dbClient.nbUsers();
-      const filesCount = await dbClient.nbFiles();
+  const usersCount = await DBClient.nbUsers();
+  const filesCount = await DBClient.nbFiles();
 
-      res.status(200).json({ users: usersCount, files: filesCount });
-    } catch (error) {
-      console.eroor('Error getting stats:', error);
-      res.status(500).json({ error: 'Internal Server Error' });
-    }
-  },
+  return res.status(200).json({
+    users: usersCount,
+    files: filesCount
+  });
+}
+
+export default {
+  getStatus,
+  getStats
 };
-
-export default AppController;

@@ -1,33 +1,61 @@
-import DBClient from '../utils/db.js';
-import { hashPassword } from '../utils/auth.js'; 
+const crypto = require('crypto');
+const dbClient = require('../utils/db');  
+const redisClient = require('../utils/redis');
 
-async function postNew(req, res) {
+const UsersController = {
+  async postNew(req, res) {
+    const { email, password } = req.body;
 
-  const { email, password } = req.body;
+    if (!email) {
+      return res.status(400).json({error: 'Missing email'});
+    }
+    
+    if (!password) {
+      return res.status(400).json({error: 'Missing password'});
+    }
 
-  if (!email) {
-    return res.status(400).json({"error": "Missing email"});
+    const existingUser = await dbClient.getUserByEmail(email);
+
+    if (existingUser) {
+      return res.status(400).json({error: 'Email already exists'});
+    }
+
+    const hashedPassword = crypto.createHash('sha1').update(password).digest('hex');
+    
+    const newUser = await dbClient.createUser(email, hashedPassword);
+   
+    const { email, _id } = newUser;
+
+    return res.status(201).json({ email, id: _id });
+  },
+
+  async getMe(req, res) {
+    const token = req.headers['x-token'];
+
+    if (!token) {
+      return res.status(401).json({error: 'Unauthorized'});
+    }
+
+    try {
+      const userId = await redisClient.get(`auth_${token}`);
+
+      if (!userId) {
+        return res.status(401).json({error: 'Unauthorized'});
+      }
+
+      const user = await dbClient.getUserById(userId);
+
+      if (!user) {
+        return res.status(401).json({error: 'Unauthorized'});  
+      }
+
+      return res.status(200).json({ email: user.email, id: user._id });
+
+    } catch (error) {
+       console.log(error);
+       return res.status(500).json({error: 'Internal Server Error'});
+    }
   }
-
-  if(!password) {
-    return res.status(400).json({"error": "Missing password"}); 
-  }
-
-  const user = await DBClient.findUserByEmail(email);
-  
-  if (user) {
-    return res.status(400).json({"error": "Already exists"});  
-  }
-
-  const hashedPassword = hashPassword(password);
-
-  const newUser = await DBClient.insertUser(email, hashedPassword);
-  
-  return res.status(201).json({
-    id: newUser._id,
-    email: newUser.email
-  });
-
-}
-
-export default { postNew };
+};
+    
+module.exports = UsersController;

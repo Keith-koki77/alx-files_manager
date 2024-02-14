@@ -2,24 +2,26 @@ import dbUtils from '../utils/db';
 import redisUtils from '../utils/redis';
 
 class AppController {
-  static async getStatus(req, res) {
-    const dbStatus = await dbUtils.isConnected();
-    const redisStatus = await redisUtils.isAlive();
-
-    return res.status(200).json({
-      redis: redisStatus,
-      db: dbStatus,
-    });
+  /**
+   * should return if Redis is alive and if the DB is alive too
+   */
+  static getStatus(request, response) {
+    const status = {
+      redis: redisClient.isAlive(),
+      db: dbClient.isAlive(),
+    };
+    response.status(200).send(status);
   }
 
-  static async getStats(req, res) {
-    const usersCount = await dbUtils.db.collection('users').countDocuments();
-    const filesCount = await dbUtils.db.collection('files').countDocuments();
-
-    return res.status(200).json({
-      users: usersCount,
-      files: filesCount,
-    });
+  /**
+   * should return the number of users and files in DB:
+   */
+  static async getStats(request, response) {
+    const stats = {
+      users: await dbClient.nbUsers(),
+      files: await dbClient.nbFiles(),
+    };
+    response.status(200).send(stats);
   }
 }
 
